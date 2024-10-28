@@ -18,8 +18,8 @@ from selenium.common.exceptions import NoSuchElementException
 from datetime import datetime
 import time
 import snowflake.connector
-import uuid
 import random
+from typing import Dict, List, Tuple
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://rpc.cfainstitute.org"
 
 class CFAInstituteScraper:
-    def __init__(self):
+    def __init__(self) -> None:
         self.driver = None
         self.titles = []
         self.summaries = []
@@ -37,7 +37,7 @@ class CFAInstituteScraper:
         self.publication_links = []
         self.processed_items = set()
 
-    def setup_driver(self):
+    def setup_driver(self) -> None:
         try:
             chrome_options = Options()
             chrome_options.add_argument("--headless")
@@ -50,7 +50,7 @@ class CFAInstituteScraper:
             logger.error(f"Failed to set up the web driver: {e}")
             raise
 
-    def start_scraping(self):
+    def start_scraping(self) -> None:
         try:
             self.driver.get(f'{BASE_URL}/en/research-foundation/publications#sort=%40officialz32xdate%20descending&f:SeriesContent=[Research%20Foundation]')
             WebDriverWait(self.driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".coveo-result-frame")))
@@ -61,7 +61,7 @@ class CFAInstituteScraper:
             logger.error(f"Failed to start scraping: {e}")
             raise
 
-    def dismiss_privacy_banner(self):
+    def dismiss_privacy_banner(self) -> None:
         try:
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.ID, "privacy-banner"))
@@ -79,7 +79,7 @@ class CFAInstituteScraper:
         except Exception as e:
             logger.error(f"Error dismissing privacy banner: {e}")
 
-    def scroll_to_bottom(self):
+    def scroll_to_bottom(self) -> None:
         last_height = self.driver.execute_script("return document.body.scrollHeight")
         while True:
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -89,7 +89,7 @@ class CFAInstituteScraper:
                 break
             last_height = new_height
 
-    def scrape_all_pages(self):
+    def scrape_all_pages(self) -> None:
         page_number = 1
         while True:
             logger.info(f"Scraping page {page_number}")
@@ -112,7 +112,7 @@ class CFAInstituteScraper:
                 break
 
 
-    def scrape_publication_list(self):
+    def scrape_publication_list(self) -> None:
         try:
             WebDriverWait(self.driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".coveo-result-frame")))
             publications = self.driver.find_elements(By.CSS_SELECTOR, ".coveo-result-frame")
@@ -153,13 +153,13 @@ class CFAInstituteScraper:
         except Exception as e:
             logger.error(f"Failed to scrape publication list: {e}")
 
-    def get_element_text(self, element):
+    def get_element_text(self, element) -> str:
         return WebDriverWait(self.driver, 10).until(EC.visibility_of(element)).text.strip()
 
-    def get_element_attribute(self, element, attribute):
+    def get_element_attribute(self, element, attribute: str) -> str:
         return WebDriverWait(self.driver, 10).until(EC.visibility_of(element)).get_attribute(attribute)
 
-    def normalize_url(self, url):
+    def normalize_url(self, url: str) -> str:
         if url.startswith('//'):
             return f"https:{url}"
         elif url.startswith('/'):
@@ -168,7 +168,7 @@ class CFAInstituteScraper:
             return f"{BASE_URL}/{url}"
         return url
 
-    def extract_summary(self, publication):
+    def extract_summary(self, publication) -> str:
         try:
             summary = self.get_element_text(publication.find_element(By.CSS_SELECTOR, "div.result-body"))
             return summary if summary else 'N/A'
@@ -176,7 +176,7 @@ class CFAInstituteScraper:
             logger.info(f"Summary not found: {e}")
             return 'N/A'
 
-    def extract_pdf_links(self):
+    def extract_pdf_links(self) -> None:
         for link in self.publication_links:
             if link != 'N/A':
                 try:
@@ -194,12 +194,12 @@ class CFAInstituteScraper:
             else:
                 self.pdf_links.append('N/A')
 
-    def close_driver(self):
+    def close_driver(self) -> None:
         if self.driver:
             self.driver.quit()
             logger.info("Driver closed successfully.")
 
-def upload_image_and_pdf_to_s3(bucket_name, image_links, pdf_links):
+def upload_image_and_pdf_to_s3(bucket_name: str, image_links: List[str], pdf_links: List[str]) -> Tuple[List[str], List[str]]:
     s3_client = boto3.client('s3')
     s3_image_links, s3_pdf_links = [], []
 
@@ -232,7 +232,7 @@ def upload_image_and_pdf_to_s3(bucket_name, image_links, pdf_links):
 
     return s3_image_links, s3_pdf_links
 
-def object_exists_in_s3(s3_client, bucket, key):
+def object_exists_in_s3(s3_client, bucket: str, key: str) -> bool:
     try:
         s3_client.head_object(Bucket=bucket, Key=key)
         return True
@@ -242,7 +242,7 @@ def object_exists_in_s3(s3_client, bucket, key):
         else:
             raise
 
-def insert_into_snowflake(titles, summaries, s3_image_links, s3_pdf_links):
+def insert_into_snowflake(titles: List[str], summaries: List[str], s3_image_links: List[str], s3_pdf_links: List[str]) -> None:
     try:
         conn = snowflake.connector.connect(
             user=os.getenv('SNOWFLAKE_USER'),
@@ -278,7 +278,7 @@ def insert_into_snowflake(titles, summaries, s3_image_links, s3_pdf_links):
         if 'conn' in locals():
             conn.close()
 
-def initialize_scraper():
+def initialize_scraper() -> Dict[str, object]:
     scraper = CFAInstituteScraper()
     scraper.setup_driver()
     return {
@@ -286,7 +286,7 @@ def initialize_scraper():
         'processed_items': list(scraper.processed_items)
     }
 
-def scrape_publications(**context):
+def scrape_publications(**context) -> Dict[str, List[str]]:
     ti = context['ti']
     setup_info = ti.xcom_pull(task_ids='setup_driver')
     
@@ -304,7 +304,7 @@ def scrape_publications(**context):
         'processed_items': list(scraper.processed_items)
     }
 
-def extract_pdfs(**context):
+def extract_pdfs(**context) -> Dict[str, List[str]]:
     ti = context['ti']
     scrape_info = ti.xcom_pull(task_ids='scrape_publications')
     
@@ -318,7 +318,7 @@ def extract_pdfs(**context):
         'pdf_links': scraper.pdf_links
     }
 
-def upload_to_s3(**context):
+def upload_to_s3(**context) -> Dict[str, List[str]]:
     ti = context['ti']
     scrape_info = ti.xcom_pull(task_ids='scrape_publications')
     pdf_info = ti.xcom_pull(task_ids='extract_pdfs')
@@ -331,7 +331,7 @@ def upload_to_s3(**context):
         's3_pdf_links': s3_pdf_links
     }
 
-def insert_data(**context):
+def insert_data(**context) -> None:
     ti = context['ti']
     scrape_info = ti.xcom_pull(task_ids='scrape_publications')
     s3_info = ti.xcom_pull(task_ids='upload_to_s3')
