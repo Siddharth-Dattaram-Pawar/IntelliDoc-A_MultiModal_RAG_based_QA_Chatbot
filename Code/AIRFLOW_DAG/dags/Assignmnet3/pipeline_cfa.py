@@ -203,7 +203,7 @@ def upload_image_and_pdf_to_s3(bucket_name, image_links, pdf_links):
     s3_client = boto3.client('s3')
     s3_image_links, s3_pdf_links = [], []
 
-    for link_list, prefix, link_type in [(image_links, 'images', 'image'), (pdf_links, 'pdfs', 'PDF')]:
+    for link_list, prefix, link_type in [(image_links, 'images_new', 'image'), (pdf_links, 'pdfs_new', 'PDF')]:
         for link in link_list:
             if link != 'N/A':
                 try:
@@ -257,10 +257,10 @@ def insert_into_snowflake(titles, summaries, s3_image_links, s3_pdf_links):
         
         for title, summary, s3_image_link, s3_pdf_link in zip(titles, summaries, s3_image_links, s3_pdf_links):
             try:
-                cursor.execute("SELECT 1 FROM CFA WHERE title = %s", (title,))
+                cursor.execute("SELECT 1 FROM CFA_NEW WHERE title = %s", (title,))
                 if not cursor.fetchone():
                     cursor.execute(
-                        "INSERT INTO CFA (title, summary, image_link, pdf_link) VALUES (%s, %s, %s, %s)",
+                        "INSERT INTO CFA_NEW (title, summary, image_link, pdf_link) VALUES (%s, %s, %s, %s)",
                         (title, summary, s3_image_link, s3_pdf_link)
                     )
                     logger.info(f"Inserted '{title}' into Snowflake.")
@@ -278,21 +278,65 @@ def insert_into_snowflake(titles, summaries, s3_image_links, s3_pdf_links):
         if 'conn' in locals():
             conn.close()
 
-def scrape_and_process():
+def initialize_scraper():
     scraper = CFAInstituteScraper()
-    try:
-        scraper.setup_driver()
-        scraper.start_scraping()
-        scraper.extract_pdf_links()
+    scraper.setup_driver()
+    return {
+        'driver_initialized': True,
+        'processed_items': list(scraper.processed_items)
+    }
 
-        bucket_name = os.getenv('AWS_BUCKET')
-        s3_image_links, s3_pdf_links = upload_image_and_pdf_to_s3(bucket_name, scraper.image_links, scraper.pdf_links)
+def scrape_publications(**context):
+    ti = context['ti']
+    setup_info = ti.xcom_pull(task_ids='setup_driver')
+    
+    scraper = CFAInstituteScraper()
+    scraper.setup_driver()
+    scraper.processed_items = set(setup_info['processed_items'])
+    
+    scraper.start_scraping()
+    
+    return {
+        'titles': scraper.titles,
+        'summaries': scraper.summaries,
+        'image_links': scraper.image_links,
+        'publication_links': scraper.publication_links,
+        'processed_items': list(scraper.processed_items)
+    }
 
-        insert_into_snowflake(scraper.titles, scraper.summaries, s3_image_links, s3_pdf_links)
-    except Exception as e:
-        logger.error(f"An error occurred during the scrape and process workflow: {e}")
-    finally:
-        scraper.close_driver()
+def extract_pdfs(**context):
+    ti = context['ti']
+    scrape_info = ti.xcom_pull(task_ids='scrape_publications')
+    
+    scraper = CFAInstituteScraper()
+    scraper.setup_driver()
+    scraper.publication_links = scrape_info['publication_links']
+    
+    scraper.extract_pdf_links()
+    
+    return {
+        'pdf_links': scraper.pdf_links
+    }
+
+def upload_to_s3(**context):
+    ti = context['ti']
+    scrape_info = ti.xcom_pull(task_ids='scrape_publications')
+    pdf_info = ti.xcom_pull(task_ids='extract_pdfs')
+    
+    bucket_name = os.getenv('AWS_BUCKET')
+    s3_image_links, s3_pdf_links = upload_image_and_pdf_to_s3(bucket_name, scrape_info['image_links'], pdf_info['pdf_links'])
+    
+    return {
+        's3_image_links': s3_image_links,
+        's3_pdf_links': s3_pdf_links
+    }
+
+def insert_data(**context):
+    ti = context['ti']
+    scrape_info = ti.xcom_pull(task_ids='scrape_publications')
+    s3_info = ti.xcom_pull(task_ids='upload_to_s3')
+    
+    insert_into_snowflake(scrape_info['titles'], scrape_info['summaries'], s3_info['s3_image_links'], s3_info['s3_pdf_links'])
 
 default_args = {
     'owner': 'airflow',
@@ -303,8 +347,36 @@ default_args = {
     'retries': 0,
 }
 
-with DAG('cfa_institute_scraper_dag', default_args=default_args, schedule_interval='@daily') as dag:
-    scrape_task = PythonOperator(
-        task_id='scrape_and_process',
-        python_callable=scrape_and_process,
+with DAG('cfa_institute_scraper_dag_new', default_args=default_args, schedule_interval='@daily', catchup=False) as dag:
+    
+    setup_task = PythonOperator(
+        task_id='setup_driver',
+        python_callable=initialize_scraper,
+        provide_context=True
     )
+
+    scrape_task = PythonOperator(
+        task_id='scrape_publications',
+        python_callable=scrape_publications,
+        provide_context=True
+    )
+
+    extract_task = PythonOperator(
+        task_id='extract_pdfs',
+        python_callable=extract_pdfs,
+        provide_context=True
+    )
+
+    upload_task = PythonOperator(
+        task_id='upload_to_s3',
+        python_callable=upload_to_s3,
+        provide_context=True
+    )
+
+    insert_task = PythonOperator(
+        task_id='insert_data',
+        python_callable=insert_data,
+        provide_context=True
+    )
+
+    setup_task >> scrape_task >> extract_task >> upload_task >> insert_task
