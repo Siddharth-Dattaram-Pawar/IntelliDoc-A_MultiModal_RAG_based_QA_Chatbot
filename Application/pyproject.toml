@@ -7,7 +7,7 @@ license = "okay"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "3.12.1"
+python = "3.12.7"
 streamlit = "^1.39.0"
 requests = "^2.32.3"
 pandas = "^2.2.3"
@@ -20,6 +20,9 @@ boto3 = "^1.35.49"
 snowflake-connector-python = "^3.12.3"
 python-multipart = "^0.0.16"
 passlib = "^1.7.4"
+pypdf2 = "^3.0.1"
+pdf2image = "^1.17.0"
+streamlit-pdf-viewer = "^0.0.19"
 
 
 [build-system]
