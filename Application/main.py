@@ -137,8 +137,18 @@ async def get_images():
 @app.get("/pdfs", dependencies=[Depends(oauth2_scheme)])
 async def get_pdfs():
     response = s3_client.list_objects_v2(Bucket=AWS_BUCKET_NAME, Prefix="pdfs_new/")
-    return [{"key": obj["Key"]} for obj in response.get("Contents", [])]
- 
+    pdf_urls = []
+    for obj in response.get("Contents", []):
+        pdf_key = obj["Key"]
+        presigned_url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": AWS_BUCKET_NAME, "Key": pdf_key},
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
+        #print(f"Generated URL for {pdf_key}: {presigned_url}")
+        pdf_urls.append({"key": pdf_key.split("/")[-1], "url": presigned_url})  # Return both key and presigned URL
+    return pdf_urls
+
 # Generate summary with NVIDIA API
 @app.post("/summarize", dependencies=[Depends(oauth2_scheme)])
 async def summarize(file_key: FileKey):
