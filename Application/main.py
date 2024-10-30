@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status   
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -10,7 +10,6 @@ import snowflake.connector
 from dotenv import load_dotenv
 import re
 import requests
-from fastapi import HTTPException
 from PyPDF2 import PdfReader
 import io
 
@@ -54,8 +53,8 @@ class User(BaseModel):
     password: str
     confirm_password: str
 
-class FileKey(BaseModel):
-    file_key: str
+class PdfLink(BaseModel):
+    pdf_link: str
 
 # JWT Token creation
 def create_access_token(data: dict):
@@ -75,6 +74,18 @@ def get_password_hash(password):
 def validate_password(password: str) -> bool:
     pattern = r'^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
     return bool(re.match(pattern, password))
+
+# Fetch PDF info from Snowflake
+def fetch_pdf_info_from_snowflake():
+    conn = get_snowflake_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT Title, Image_Link, PDF_Link FROM CFA_NEW")
+        pdf_info = cursor.fetchall()
+        return [{"Title": row[0], "Image_Link": row[1], "PDF_Link": row[2]} for row in pdf_info]
+    finally:
+        cursor.close()
+        conn.close()
 
 # User registration endpoint
 @app.post("/register")
@@ -121,54 +132,69 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(data={"sub": form_data.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# Retrieve images from S3
+# Retrieve images endpoint
 @app.get("/images", dependencies=[Depends(oauth2_scheme)])
 async def get_images():
-    response = s3_client.list_objects_v2(Bucket=AWS_BUCKET_NAME, Prefix="images_new/")
-    image_urls = []
-    for obj in response.get("Contents", []):
-        image_key = obj["Key"]
-        presigned_url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": AWS_BUCKET_NAME, "Key": image_key},
-            ExpiresIn=3600  # URL expires in 1 hour
-        )
-        image_urls.append({"key": image_key, "url": presigned_url})
-    return image_urls
+    pdf_info = fetch_pdf_info_from_snowflake()
+    return [{"Title": pdf['Title'], "Image_Link": pdf['Image_Link']} for pdf in pdf_info if pdf['Image_Link']]
 
-# Retrieve PDFs from S3
+# Retrieve PDFs endpoint
 @app.get("/pdfs", dependencies=[Depends(oauth2_scheme)])
 async def get_pdfs():
-    response = s3_client.list_objects_v2(Bucket=AWS_BUCKET_NAME, Prefix="pdfs_new/")
-    pdf_urls = []
-    for obj in response.get("Contents", []):
-        pdf_key = obj["Key"]
-        presigned_url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": AWS_BUCKET_NAME, "Key": pdf_key},
-            ExpiresIn=3600  # URL expires in 1 hour
-        )
-        pdf_urls.append({"key": pdf_key.split("/")[-1], "url": presigned_url})
-    return pdf_urls
+    pdf_info = fetch_pdf_info_from_snowflake()
+    default_image_url = "https://as1.ftcdn.net/v2/jpg/02/17/88/52/1000_F_217885295_7a4cZ28RGP15RPzeRhFSYx49YMwk5Y53.jpg"
+    
+    for pdf in pdf_info:
+        if pdf['PDF_Link'].startswith('s3://'):
+            bucket, key = pdf['PDF_Link'][5:].split('/', 1)
+            pdf['url'] = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": key},
+                ExpiresIn=3600
+            )
+        else:
+            pdf['url'] = pdf['PDF_Link']
+        
+        if pdf['Image_Link'] and pdf['Image_Link'] != 'N/A':
+            if pdf['Image_Link'].startswith('s3://'):
+                bucket, key = pdf['Image_Link'][5:].split('/', 1)
+                pdf['image_url'] = s3_client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": bucket, "Key": key},
+                    ExpiresIn=3600
+                )
+            else:
+                pdf['image_url'] = pdf['Image_Link']
+        else:
+            pdf['image_url'] = default_image_url
+    
+    return pdf_info
 
-# Summarize endpoint to fetch PDF, extract text, and generate summary
+# Summarize endpoint
 @app.post("/summarize")
-async def summarize(file_key: FileKey, token: str = Depends(oauth2_scheme)):
-    # Fetch PDF from S3
-    s3_key = f"pdfs_new/{file_key.file_key}"
-    try:
-        response = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key=s3_key)
-        pdf_content = response['Body'].read()
-        pdf_reader = PdfReader(io.BytesIO(pdf_content))
-        pdf_text = "".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
+async def summarize(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):
+    # Fetch PDF content
+    if pdf_link.pdf_link.startswith('s3://'):
+        # Extract the key from the S3 URI
+        bucket, key = pdf_link.pdf_link[5:].split('/', 1)
+        try:
+            response = s3_client.get_object(Bucket=bucket, Key=key)
+            pdf_content = response['Body'].read()
+        except s3_client.exceptions.NoSuchKey:
+            raise HTTPException(status_code=404, detail=f"PDF file not found: {pdf_link.pdf_link}")
+    else:
+        # Fetch PDF from URL
+        response = requests.get(pdf_link.pdf_link)
+        if response.status_code != 200:
+            raise HTTPException(status_code=404, detail=f"PDF file not found: {pdf_link.pdf_link}")
+        pdf_content = response.content
 
-        if not pdf_text:
-            raise HTTPException(status_code=400, detail="PDF content is empty or could not be extracted.")
+    # Extract text from PDF
+    pdf_reader = PdfReader(io.BytesIO(pdf_content))
+    pdf_text = "".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
 
-    except s3_client.exceptions.NoSuchKey:
-        raise HTTPException(status_code=404, detail=f"PDF file not found: {s3_key}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading PDF from S3: {str(e)}")
+    if not pdf_text:
+        raise HTTPException(status_code=400, detail="PDF content is empty or could not be extracted.")
 
     # Call NVIDIA's API for summarization
     nvidia_api_url = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -203,3 +229,4 @@ async def summarize(file_key: FileKey, token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
     except ValueError:
         raise HTTPException(status_code=500, detail="Invalid response format from NVIDIA API")
+
