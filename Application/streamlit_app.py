@@ -66,10 +66,6 @@ def image_view():
         image_name = image["key"].split("/")[-1]  # Get only the file name without the folder path
         with cols[idx % 3]:
             st.image(image_url, use_column_width=True, caption=image_name)
-          
-# Helper function to strip the .pdf extension
-def get_pdf_title(filename):
-    return os.path.splitext(filename)[0]
 
 # Helper function to fetch PDF as binary data from S3
 def fetch_pdf_binary(url):
@@ -79,51 +75,69 @@ def fetch_pdf_binary(url):
     else:
         st.error("Failed to fetch PDF.")
         return None
+    
+def fetch_summary(file_key):
+    response = requests.post(
+        f"{API_URL}/summarize",
+        headers={"Authorization": f"Bearer {st.session_state['access_token']}"},
+        json={"file_key": file_key}
+    )
+    if response.status_code == 200:
+        return response.json()["summary"]
+    else:
+        st.error(f"Failed to fetch summary. Error: {response.json().get('detail', 'Unknown error')}")
+        return None
 
 def pdf_view(view_type):
     # Fetch PDFs
-    pdfs_response = requests.get(f"{API_URL}/pdfs", headers={"Authorization": f"Bearer {st.session_state['access_token']}"})
-    
-    if pdfs_response.status_code != 200:
-        st.error("Failed to fetch PDFs.")
-        return
-    
-    pdfs = pdfs_response.json()
-    
-    if not pdfs:
+    pdfs_response = requests.get(f"{API_URL}/pdfs", headers={"Authorization": f"Bearer {st.session_state['access_token']}"}).json()
+    if not pdfs_response:
         st.warning("No PDFs found.")
         return
 
-    # Prepare PDF items with presigned URLs and cleaned titles
-    pdf_items = [{"title": get_pdf_title(pdf["key"].split("/")[-1]), "url": pdf["url"]} for pdf in pdfs]
+    pdf_items = [{"title": pdf["key"].split("/")[-1].replace(".pdf", ""), "url": pdf["url"]} for pdf in pdfs_response]
+
 
     if view_type == "Grid View":
-        # Arrange PDFs in rows with 3 columns per row
-        num_columns = 3
+        # Display PDFs in a grid format
+        num_columns = 2
         for i in range(0, len(pdf_items), num_columns):
             cols = st.columns(num_columns)
             for col, item in zip(cols, pdf_items[i:i + num_columns]):
                 with col:
                     st.markdown(f"### {item['title']}")
-                    if st.button(f"Preview '{item['title']}'", key=item['title']):
+                    if st.button("Preview", key=f"preview_{item['title']}"):
                         pdf_binary_data = fetch_pdf_binary(item["url"])
                         if pdf_binary_data:
-                            with st.expander("Preview PDF", expanded=True):
-                                pdf_viewer(input=pdf_binary_data, width=700, height=800)  # Adjust height for scrolling
+                            with st.expander("PDF Preview", expanded=True):
+                                pdf_viewer(input=pdf_binary_data, width=700, height=800)  # Scrollable container
+                    if st.button("Summarize", key=f"summarize_{item['title']}"):
+                        summary = fetch_summary(f"{item['title']}.pdf")
+                        if summary:
+                            st.markdown("### Summary")
+                            st.write(summary)
 
     elif view_type == "Dropdown View":
+        # Display PDFs in a dropdown selection format
         pdf_titles = [item["title"] for item in pdf_items]
-        pdf_selected_title = st.selectbox("Select PDF", pdf_titles)
-    
+        pdf_selected_title = st.selectbox("Select a PDF to view", pdf_titles)
+        
         if pdf_selected_title:
             selected_item = next(item for item in pdf_items if item["title"] == pdf_selected_title)
             st.markdown(f"### {selected_item['title']}")
-            if st.button("Preview Selected PDF"):
-                pdf_binary_data = fetch_pdf_binary(selected_item["url"])
-                if pdf_binary_data:
-                # Display PDF without expander for full-width preview
-                    pdf_viewer(input=pdf_binary_data, width=None, height=800) 
-
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Preview Selected PDF"):
+                    pdf_binary_data = fetch_pdf_binary(selected_item["url"])
+                    if pdf_binary_data:
+                        with st.expander("PDF Preview", expanded=True):
+                            pdf_viewer(input=pdf_binary_data, width=700, height=800)  # Scrollable container
+            with col2:
+                if st.button("Summarize Selected PDF"):
+                    summary = fetch_summary(f"{selected_item['title']}.pdf")
+                    if summary:
+                        st.markdown("### Summary")
+                        st.write(summary)
 
 # Display login or registration page if not logged in
 if "access_token" not in st.session_state:
