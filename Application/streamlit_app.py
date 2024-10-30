@@ -4,7 +4,6 @@ from streamlit_pdf_viewer import pdf_viewer
 import requests
 from dotenv import load_dotenv
 import os
-import snowflake.connector
 
 
 # Load environment variables
@@ -12,9 +11,7 @@ load_dotenv()
 API_URL = os.getenv("API_URL")
 
 st.set_page_config(layout="wide")
-st.title("PDF Viewer App")
-
-import streamlit as st
+#st.title("IntelliDoc")
 
 st.markdown("""
 <style>
@@ -24,6 +21,13 @@ st.markdown("""
         color: white !important;
     }
 
+    .title-text {
+        text-align: center;
+        font-size: 3em;
+        font-weight: bold;
+        margin-bottom: 1em;
+    }
+            
     /* Set all heading colors to white */
     h1, h2, h3, h4, h5, h6 {
         color: white !important;
@@ -67,7 +71,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
+st.markdown('<h1 class="title-text">IntelliDoc</h1>', unsafe_allow_html=True)
 
 # Helper functions
 def fetch_pdf_binary(pdf_link):
