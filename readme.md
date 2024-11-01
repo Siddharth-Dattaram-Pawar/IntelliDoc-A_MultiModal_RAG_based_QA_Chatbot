@@ -38,6 +38,10 @@ Siddharth Pawar :
 14. 
 15. [Acknowledgments](#acknowledgments)
 
+### Architecture Diagram
+
+![image](https://github.com/user-attachments/assets/4641f247-8830-4cb3-b3a3-3ec4a8c8bbb6)
+
 ### Components
 
 1. **Web Scraping and Data Ingestion Pipeline**
