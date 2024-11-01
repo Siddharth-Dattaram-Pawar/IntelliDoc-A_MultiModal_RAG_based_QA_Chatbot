@@ -122,7 +122,7 @@ For support, please open an issue in the GitHub repository or contact the develo
 
 Vaishnavi Veerkumar : Webscraping using selenium, Airflow automation, Snowflake integration for the scrapped elements, S3 storage for the scrapped elements, Summarization model using Nvidia services, Vector embedding of PDF and user input using Nvidia series, Streamlit UI
 
-Sriram Venkatesh : Streamlit UI development with interactive components, FastAPI backend implementation, System architecture diagrams using Python Diagrams, Pinecone index creation, Vector embeddings of PDF documents, NVIDIA model integration for text and image processing, Logging system, JWT authentication and authorization flow
+Sriram Venkatesh : Streamlit UI development, FastAPI backend implementation, System architecture using Diagrams, Pinecone index creation, Vector embeddings of PDF documents, NVIDIA model integration for text and image processing, Logging system, JWT authentication and authorization flow
 
 Siddharth Pawar :
 
