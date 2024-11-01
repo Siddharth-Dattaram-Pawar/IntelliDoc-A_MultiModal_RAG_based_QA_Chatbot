@@ -4,20 +4,10 @@
 
 This project involves developing a FastAPI and Streamlit-based document exploration application for clients to securely access, explore, and analyze research publications from the CFA Institute Research Foundation. The application facilitates efficient data ingestion, document interaction, and multi-modal querying with capabilities for summarization and research note generation.
 
-Codelab [Link]
-
-Youtube Video [Link]
+Codelab [Link](https://codelabs-preview.appspot.com/?file_id=1ZKUCJ26fZkN3CAf_9Ul-TJlIDZqkYzMIgs5npvLNNTw/edit?tab=t.0#0) (Includes Youtube Video)
 
 WE ATTEST THAT WE HAVEN'T USED ANY OTHER STUDENTS' WORK IN OUR ASSIGNMENT AND ABIDE BY THE POLICIES LISTED IN THE STUDENT HANDBOOK
 
-
-## Contribution
-
-Vaishnavi Veerkumar :
-
-Sriram Venkatesh :
-
-Siddharth Pawar :
 
 
 ### Table of Contents
@@ -27,16 +17,10 @@ Siddharth Pawar :
 3. [Technologies Used](#technologies-used)
 4. [Install dependencies using Poetry](#install-dependencies-using-poetry)
 5. [Set up environment variables](#set-up-environment-variables)
-6. 
-7. [Deployment](#deployment)
-8. [Access the application](#access-the-application)
-9. [Monitoring](#monitoring)
-10. [Security](#security)
-11. 
-12. [License](#license)
-13. [Support](#support)
-14. 
-15. [Acknowledgments](#acknowledgments)
+6. [Deployment](#deployment)
+7. [License](#license)
+8. [Support](#support)
+9. [Acknowledgments](#acknowledgments)
 
 ### Architecture Diagram
 
@@ -78,7 +62,7 @@ AWS S3: Storage for images and PDFs associated with research documents
 
 Snowflake: Data warehouse to store metadata, research notes, and user data
 
-NVIDIA llama-3.1-nemotron-70b-instruct : model to enable real-time, context-based summaries of document content, enhancing user engagement with concise and relevant information.
+NVIDIA meta llama-3.1-8b-instruct : Advanced state-of-the-art model with language understanding, superior reasoning, and text generation.
 
 NVIDIA DePlot: Converts graphs and plots from documents into descriptive text, making visual data accessible for text-based search and analysis.
 
@@ -96,8 +80,8 @@ Docker: Containerization tool for packaging the FastAPI and Streamlit applicatio
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/cfa-research-platform.git
-cd cfa-research-platform
+git clone https://github.com/BigDataIA-Fall2024-TeamA4/Assignmnet3.git
+cd Assignmnet3
 ```
 ### Install dependencies using Poetry:
 ```bash
@@ -119,28 +103,12 @@ export NVIDIA_API_KEY="your-api-key"
 docker-compose build
 ```
 
-* **Deploy to Google Cloud:**
+* **Deploy to AWS:**
 ```bash
-* Make sure your GCP credentials are set correctly to access the GCS bucket containing the task files as well as the SQL Database containing user Data.
+* Make sure your AWS credentials are set correctly to access the S3 bucket containing the task files as well as the RDS database containing user data.
 ```
 
-### Access the application:
 
-* **Frontend:** https://your-domain.com
-* **API:** https://api.your-domain.com
-
-### Monitoring
-
-* **Application metrics:** Google Cloud Monitoring
-* **Logs:** Google Cloud Logging
-* **Tracing:** Cloud Trace
-
-### Security
-
-* **GCP IAM for access control**
-* **API authentication using JWT**
-* **Data encryption at rest and in transit**
-* **Regular security audits**
 
 ### License
 
@@ -149,6 +117,14 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ### Support
 
 For support, please open an issue in the GitHub repository or contact the development team.
+
+## Contribution
+
+Vaishnavi Veerkumar : Webscraping using selenium, Airflow automation, Snowflake integration for the scrapped elements, S3 storage for the scrapped elements, Summarization model using Nvidia services, Vector embedding of PDF and user input using Nvidia series, Streamlit UI
+
+Sriram Venkatesh : Streamlit UI development with interactive components, FastAPI backend implementation, System architecture diagrams using Python Diagrams, Pinecone index creation, Vector embeddings of PDF documents, NVIDIA model integration for text and image processing, Logging system, JWT authentication and authorization flow
+
+Siddharth Pawar :
 
 
 ### Acknowledgments
