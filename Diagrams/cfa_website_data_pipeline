@@ -1,0 +1,66 @@
+digraph "CFA Website Data Pipeline" {
+	graph [fontcolor="#2D3436" fontname="Sans-Serif" fontsize=15 label="CFA Website Data Pipeline" nodesep=0.60 pad=2.0 rankdir=LR ranksep=0.75 splines=ortho]
+	node [fixedsize=true fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13 height=1.4 imagescale=true labelloc=b shape=box style=rounded width=1.4]
+	edge [color="#7B8894"]
+	bb33a51ce91e482889ae709ed0e85d0b -> "99be4ecd4d3e4604b0154b0fe272110c" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"99be4ecd4d3e4604b0154b0fe272110c" -> bbdcf2f44224482d8a6fb0653dc63f62 [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	bbdcf2f44224482d8a6fb0653dc63f62 -> "6e343a8ac27347caa82a173a1ad8a140" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"6e343a8ac27347caa82a173a1ad8a140" -> "860c4ef851b04991a20ad74853304824" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"6e343a8ac27347caa82a173a1ad8a140" -> "388a25f88c43438b84d7a976993be367" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph "cluster_Data Ingestion Layer" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Data Ingestion Layer" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		bb33a51ce91e482889ae709ed0e85d0b [label="CFA Website" height=1.9 image="./cfa.jpeg" shape=none]
+		"99be4ecd4d3e4604b0154b0fe272110c" [label="Selenium Scraper" height=1.9 image="./selenium.jpeg" shape=none]
+		subgraph "cluster_Docker Cluster" {
+			graph [bgcolor="#EBF3E7" fontname="Sans-Serif" fontsize=12 label="Docker Cluster" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			bbdcf2f44224482d8a6fb0653dc63f62 [label="Airflow DAG" height=1.9 image="c:\Users\srira\AppData\Local\Programs\Python\Python312\Lib\site-packages\resources/onprem/workflow\airflow.png" shape=none]
+			"6e343a8ac27347caa82a173a1ad8a140" [label="Docker Container" height=1.9 image="c:\Users\srira\AppData\Local\Programs\Python\Python312\Lib\site-packages\resources/onprem/container\docker.png" shape=none]
+		}
+		"860c4ef851b04991a20ad74853304824" [label="S3 Bucket - PDFs" height=1.9 image="c:\Users\srira\AppData\Local\Programs\Python\Python312\Lib\site-packages\resources/aws/storage\simple-storage-service-s3.png" shape=none]
+		"388a25f88c43438b84d7a976993be367" [label="Snowflake - Metadata" height=1.9 image="c:\Users\srira\AppData\Local\Programs\Python\Python312\Lib\site-packages\resources/generic/database\sql.png" shape=none]
+	}
+	"05529540b3fc407ab5c771ffbb8af36c" -> "883e5a215c364ff190d2a08c8dc8421e" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"05529540b3fc407ab5c771ffbb8af36c" -> "0c0924f3aee247f299b774e6283c9fd4" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"05529540b3fc407ab5c771ffbb8af36c" -> "16f03c35b1564969a1a518199b6d3657" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph "cluster_User Interface Layer" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="User Interface Layer" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"05529540b3fc407ab5c771ffbb8af36c" [label="Streamlit Frontend" height=1.9 image="./streamlit.jpeg" shape=none]
+		"883e5a215c364ff190d2a08c8dc8421e" [label="Authentication - JWT" height=1.9 image="./icons/jwt.png" shape=none]
+		"0c0924f3aee247f299b774e6283c9fd4" [label="PDF Viewer" height=1.9 image="./icons/viewer.png" shape=none]
+		"16f03c35b1564969a1a518199b6d3657" [label="Q&A Interface" height=1.9 image="./icons/qna.png" shape=none]
+	}
+	"883e5a215c364ff190d2a08c8dc8421e" -> "7987bbfe240e44708976b6a622042733" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"0c0924f3aee247f299b774e6283c9fd4" -> "7987bbfe240e44708976b6a622042733" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"7987bbfe240e44708976b6a622042733" -> bd34592100bc46dfa273f3bdd9a470db [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"16f03c35b1564969a1a518199b6d3657" -> "7987bbfe240e44708976b6a622042733" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"7987bbfe240e44708976b6a622042733" -> "388a25f88c43438b84d7a976993be367" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"7987bbfe240e44708976b6a622042733" -> "16810f249f264bcc9aa3264ce8fe7082" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"7987bbfe240e44708976b6a622042733" -> "860c4ef851b04991a20ad74853304824" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph "cluster_Backend Services" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Backend Services" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"7987bbfe240e44708976b6a622042733" [label="FastAPI Backend" height=1.9 image="./fastapi.jpeg" shape=none]
+		bd34592100bc46dfa273f3bdd9a470db [label="NVIDIA API" height=1.9 image="./nvidia.jpeg" shape=none]
+		"16810f249f264bcc9aa3264ce8fe7082" [label="Pinecone - Vector DB" height=1.9 image="./pinecone.jpeg" shape=none]
+	}
+	bd34592100bc46dfa273f3bdd9a470db -> "7b13d0df69534931af8d593b10d869e6" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	bd34592100bc46dfa273f3bdd9a470db -> "1a730462ccac46c38396497d5f25d38a" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph "cluster_AI Services Layer" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="AI Services Layer" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"7b13d0df69534931af8d593b10d869e6" [label="Llama (Summary)" height=1.9 image="./nvidia.jpeg" shape=none]
+		"1a730462ccac46c38396497d5f25d38a" [label="Embed (Q&A)" height=1.9 image="./nvidia.jpeg" shape=none]
+	}
+	"860c4ef851b04991a20ad74853304824" -> "860c4ef851b04991a20ad74853304824" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"388a25f88c43438b84d7a976993be367" -> "388a25f88c43438b84d7a976993be367" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"16810f249f264bcc9aa3264ce8fe7082" -> "16810f249f264bcc9aa3264ce8fe7082" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph "cluster_Storage Layer" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Storage Layer" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+	}
+	"883e5a215c364ff190d2a08c8dc8421e" -> "0c0924f3aee247f299b774e6283c9fd4" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"0c0924f3aee247f299b774e6283c9fd4" -> "7b13d0df69534931af8d593b10d869e6" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"7b13d0df69534931af8d593b10d869e6" -> "388a25f88c43438b84d7a976993be367" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"0c0924f3aee247f299b774e6283c9fd4" -> "1a730462ccac46c38396497d5f25d38a" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"1a730462ccac46c38396497d5f25d38a" -> "388a25f88c43438b84d7a976993be367" [dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph "cluster_Data Flow Sequence" {
+		graph [bgcolor="#E5F5FD" fontname="Sans-Serif" fontsize=12 label="Data Flow Sequence" labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+	}
+}
