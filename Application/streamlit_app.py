@@ -248,13 +248,17 @@ def pdf_detail_view():
 def qa_with_bot():
     st.subheader("Q&A with the Bot")
  
-    # If no PDF is selected, display the PDF list for selection
+    # Initialize chat history if not already present
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+ 
+    # Check if a PDF has been selected
     if "selected_pdf" not in st.session_state:
         # Fetch list of PDFs if not already loaded
         if "pdf_list" not in st.session_state:
-            st.session_state["pdf_list"] = fetch_pdf_info_from_snowflake()  # Get PDF info from API
-        pdf_items = st.session_state["pdf_list"]
+            st.session_state["pdf_list"] = fetch_pdf_info_from_snowflake()
  
+        pdf_items = st.session_state["pdf_list"]
         if not pdf_items:
             st.warning("No PDFs available.")
             return
@@ -262,57 +266,73 @@ def qa_with_bot():
         # Dropdown to select a PDF
         pdf_titles = [item["Title"] for item in pdf_items]
         selected_title = st.selectbox("Select a PDF", pdf_titles)
-        selected_pdf = next(item for item in pdf_items if item["Title"] == selected_title)
  
-        # Display selected PDF details
+        # Find and store the selected PDF in session state
+        selected_pdf = next(item for item in pdf_items if item["Title"] == selected_title)
         st.image(selected_pdf['image_url'] if selected_pdf.get('image_url') else "default_cover_image.jpg", width=150)
         st.markdown(f"**Title:** {selected_pdf['Title']}")
  
         if st.button("Continue to Q&A"):
             st.session_state['selected_pdf'] = selected_pdf
- 
     else:
         # Q&A with the selected PDF
         selected_pdf = st.session_state['selected_pdf']
-       
+ 
         # Display PDF details for context
         st.image(selected_pdf['image_url'] if selected_pdf.get('image_url') else "default_cover_image.jpg", width=150)
         st.markdown(f"**Title:** {selected_pdf['Title']}")
+ 
+        # Display chat history with user and bot responses
+        for user_q, bot_a in st.session_state.chat_history:
+            st.write(f"**You:** {user_q}")
+            st.write(f"**Bot:** {bot_a}")
  
         # Input for question
         question = st.text_input("Ask a question about the PDF content:")
  
         if st.button("Submit Question"):
             if question:
-                # Create embedding for the selected PDF
+                # Create embedding for the selected PDF without using conversation history
                 response = requests.post(
                     f"{API_URL}/embed",
                     headers={"Authorization": f"Bearer {st.session_state['access_token']}"},
                     json={"pdf_link": selected_pdf["url"]}
                 )
+ 
                 if response.status_code == 200:
                     embedding_id = response.json().get("document_id")
-                    st.success(f"Embedding created and saved successfully. Document ID: {embedding_id}")
-                   
-                    # Now, proceed with asking the bot the question
+                    if "message" in response.json() and response.json()["message"] == "Embeddings already exist":
+                        st.info(f"Using existing embeddings. Document ID: {embedding_id}")
+                    else:
+                        st.success(f"Embedding created and saved successfully. Document ID: {embedding_id}")
+ 
+                    # Send only the current question to the bot API
                     bot_response = requests.post(
-                        f"{API_URL}/ask_bot",
+                        f"{API_URL}/chat",
                         headers={"Authorization": f"Bearer {st.session_state['access_token']}"},
-                        json={"question": question, "document_id": embedding_id}
+                        json={"user_input": question, "document_id": embedding_id}
                     )
+ 
                     if bot_response.status_code == 200:
-                        answer = bot_response.json().get("answer", "No answer provided.")
+                        answer = bot_response.json().get("response", "No answer provided.")
                         st.write("Answer:", answer)
+                        # Append new Q&A to chat history for display only
+                        st.session_state.chat_history.append((question, answer))
                     else:
                         st.error("Failed to retrieve answer from bot.")
                 else:
-                    st.error("Failed to create embeddings for the PDF.")
+                    st.error("Failed to create or retrieve embeddings for the PDF.")
             else:
                 st.warning("Please enter a question to ask.")
  
+        # Clear chat history button
+        if st.button("Clear Chat History"):
+            st.session_state.chat_history = []
+ 
+        # Back button to go back to PDF selection
         if st.button("Back to PDF Selection"):
-            # Clear selected PDF to show the PDF selection dropdown
             del st.session_state['selected_pdf']
+ 
  
 # Main Page Navigation Logic
 if "logged_in" not in st.session_state:
@@ -337,4 +357,3 @@ else:
         pdf_detail_view()
     elif st.session_state["page"] == "qa_with_bot":
         qa_with_bot()
- 
