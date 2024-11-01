@@ -48,33 +48,31 @@ WE ATTEST THAT WE HAVEN'T USED ANY OTHER STUDENTS' WORK IN OUR ASSIGNMENT AND AB
 
 ### Technologies Used
 
-Key Technologies and Roles
+**FastAPI:** Backend framework for user authentication, document retrieval, and summarization APIs
 
-FastAPI: Backend framework for user authentication, document retrieval, and summarization APIs
+**Streamlit:** Frontend application framework for document exploration and interaction
 
-Streamlit: Frontend application framework for document exploration and interaction
+**CFA Institute Research Foundation Publications:** Source of data for the research documents
 
-CFA Institute Research Foundation Publications: Source of data for the research documents
+**Airflow & Selenium:** Tools for automating data ingestion and web scraping
 
-Airflow & Selenium: Tools for automating data ingestion and web scraping
+**AWS S3:** Storage for images and PDFs associated with research documents
 
-AWS S3: Storage for images and PDFs associated with research documents
+**Snowflake:** Data warehouse to store metadata, research notes, and user data
 
-Snowflake: Data warehouse to store metadata, research notes, and user data
+**NVIDIA meta llama-3.1-8b-instruct :** Advanced state-of-the-art model with language understanding, superior reasoning, and text generation.
 
-NVIDIA meta llama-3.1-8b-instruct : Advanced state-of-the-art model with language understanding, superior reasoning, and text generation.
+**NVIDIA DePlot:** Converts graphs and plots from documents into descriptive text, making visual data accessible for text-based search and analysis.
 
-NVIDIA DePlot: Converts graphs and plots from documents into descriptive text, making visual data accessible for text-based search and analysis.
+**NVIDIA NeVA 22B:** Transforms images within documents into text representations, allowing comprehensive querying across visual data types.
 
-NVIDIA NeVA 22B: Transforms images within documents into text representations, allowing comprehensive querying across visual data types.
+**NVIDIA embedqa-v5-v6 Model:** Generates detailed text embeddings, supporting high-precision, contextually relevant retrieval of document content in the query system.
 
-NVIDIA embedqa-v5-v6 Model: Generates detailed text embeddings, supporting high-precision, contextually relevant retrieval of document content in the query system.
+**NVIDIA API Key:** Secures and manages access to all NVIDIA functionalities, ensuring authenticated, controlled usage across summarization and querying features.
 
-NVIDIA API Key: Secures and manages access to all NVIDIA functionalities, ensuring authenticated, controlled usage across summarization and querying features.
+**Pinecone:** Vector database for storing and retrieving embeddings for context-based search
 
-Pinecone: Vector database for storing and retrieving embeddings for context-based search
-
-Docker: Containerization tool for packaging the FastAPI and Streamlit applications to streamline deployment on cloud platforms
+**Docker:** Containerization tool for packaging the FastAPI and Streamlit applications to streamline deployment on cloud platforms
 
 ## Environment Setup
 
@@ -83,12 +81,12 @@ Docker: Containerization tool for packaging the FastAPI and Streamlit applicatio
 git clone https://github.com/BigDataIA-Fall2024-TeamA4/Assignmnet3.git
 cd Assignmnet3
 ```
-### Install dependencies using Poetry:
+## Install dependencies using Poetry:
 ```bash
 poetry install
 ```
 
-### Set up environment variables:
+## Set up environment variables:
 ```bash
 export S3_KEY="path/to/service-account.json"
 export SNOWFLAKE_ACCOUNT="your-account"
@@ -96,7 +94,7 @@ export PINECONE_API_KEY="your-api-key"
 export NVIDIA_API_KEY="your-api-key"
 ```
 
-### Deployment
+## Deployment
 
 * **Build Docker images:**
 ```bash
@@ -109,25 +107,24 @@ docker-compose build
 ```
 
 
-
-### License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Support
+## Support
 
 For support, please open an issue in the GitHub repository or contact the development team.
 
 ## Contribution
 
-Vaishnavi Veerkumar : Webscraping using selenium, Airflow automation, Snowflake integration for the scrapped elements, S3 storage for the scrapped elements, Summarization model using Nvidia services, Vector embedding of PDF and user input using Nvidia series, Streamlit UI
+**Vaishnavi Veerkumar (40%)**: Webscraping using selenium, Airflow automation, Snowflake integration for the scrapped elements, S3 storage for the scrapped elements, Summarization model using Nvidia services, Vector embedding of PDF and user input using Nvidia series, Streamlit UI
 
-Sriram Venkatesh : Streamlit UI development, FastAPI backend implementation, System architecture using Diagrams, Pinecone index creation, Vector embeddings of PDF documents, NVIDIA model integration for text and image processing, Logging system, JWT authentication and authorization flow
+**Sriram Venkatesh (30%)** : Streamlit UI development, FastAPI backend implementation, System architecture using Diagrams, Pinecone index creation, Vector embeddings of PDF documents, NVIDIA model integration for text and image processing, Logging system, JWT authentication and authorization flow
 
-Siddharth Pawar :
+**Siddharth Pawar (30%)** : User Registration and Login, Storage of User data in Snowflake, Development of Streamlit UI, JWT-based authentication and authorization flow,  Fetching PDFs and Images for user choice and handling the grid/dropdown view, Convert Images/charts/plots into text embeddings using NVIDIA Services, vector text embedding generation and storing it in correct pinecone index alongside the PDF identifier, creation of Pinecone index,  Codelabs Document
 
 
-### Acknowledgments
+## Acknowledgments
 
 * CFA Institute Research Foundation
 * NVIDIA for AI services
