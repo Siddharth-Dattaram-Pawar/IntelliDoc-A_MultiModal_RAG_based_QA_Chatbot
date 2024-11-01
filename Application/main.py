@@ -20,7 +20,6 @@ import logging
 import warnings
 import io
 
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,6 +108,9 @@ class User(BaseModel):
 
 class PdfLink(BaseModel):
     pdf_link: str
+
+class FileKey(BaseModel):
+    file_key: str
 
 # JWT Token creation
 def create_access_token(data: dict):
@@ -260,29 +262,23 @@ async def get_pdfs():
 
 # Summarize endpoint
 @app.post("/summarize")
-async def summarize(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):
-    # Fetch PDF content
-    if pdf_link.pdf_link.startswith('s3://'):
-        # Extract the key from the S3 URI
-        bucket, key = pdf_link.pdf_link[5:].split('/', 1)
-        try:
-            response = s3_client.get_object(Bucket=bucket, Key=key)
-            pdf_content = response['Body'].read()
-        except s3_client.exceptions.NoSuchKey:
-            raise HTTPException(status_code=404, detail=f"PDF file not found: {pdf_link.pdf_link}")
-    else:
-        # Fetch PDF from URL
-        response = requests.get(pdf_link.pdf_link)
-        if response.status_code != 200:
-            raise HTTPException(status_code=404, detail=f"PDF file not found: {pdf_link.pdf_link}")
-        pdf_content = response.content
+async def summarize(file_key: FileKey, token: str = Depends(oauth2_scheme)):
 
-    # Extract text from PDF
-    pdf_reader = PdfReader(io.BytesIO(pdf_content))
-    pdf_text = "".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
+    # Fetch PDF from S3
+    s3_key = file_key.file_key
+    try:
+        response = s3_client.get_object(Bucket=AWS_BUCKET_NAME, Key=s3_key)
+        pdf_content = response['Body'].read()
+        pdf_reader = PdfReader(io.BytesIO(pdf_content))
+        pdf_text = "".join([page.extract_text() for page in pdf_reader.pages if page.extract_text()])
 
-    if not pdf_text:
-        raise HTTPException(status_code=400, detail="PDF content is empty or could not be extracted.")
+        if not pdf_text:
+            raise HTTPException(status_code=400, detail="PDF content is empty or could not be extracted.")
+
+    except s3_client.exceptions.NoSuchKey:
+        raise HTTPException(status_code=404, detail=f"PDF file not found: {s3_key}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading PDF from S3: {str(e)}")
 
     # Call NVIDIA's API for summarization
     nvidia_api_url = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -293,20 +289,20 @@ async def summarize(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):
     # Limit text to the first 4000 characters for the prompt
     prompt_text = f"Summarize the following text:\n\n{pdf_text[:2000]}"
     payload = {
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct",
+        "model": "meta/llama-3.1-8b-instruct",
         "messages": [{"role": "user", "content": prompt_text}],
-        "max_tokens": 400,
+        "max_tokens": 200,  # Reduced tokens
         "temperature": 0.5
-    }
+        }
 
     try:
         nvidia_response = requests.post(nvidia_api_url, json=payload, headers=headers)
-        nvidia_response.raise_for_status()  # Ensure successful HTTP response
+        nvidia_response.raise_for_status()  # This will raise an exception for non-200 status codes
         response_data = nvidia_response.json()
-        
+
         # Extract summary text from response
         summary = response_data.get("choices", [{}])[0].get("message", {}).get("content", "No summary generated")
-        
+
         # Check if summary is generic or empty
         if summary.strip().lower() in ["no summary generated", ""]:
             raise HTTPException(status_code=500, detail="Summary generation failed or returned a generic response.")
@@ -314,9 +310,16 @@ async def summarize(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):
         return {"summary": summary}
 
     except requests.RequestException as e:
+        logger.error(f"NVIDIA API request failed: {str(e)}")
+        logger.error(f"NVIDIA API response: {nvidia_response.text}")
         raise HTTPException(status_code=500, detail=f"Failed to generate summary: {str(e)}")
-    except ValueError:
+    except ValueError as e:
+        logger.error(f"Invalid JSON response from NVIDIA API: {str(e)}")
+        logger.error(f"NVIDIA API response: {nvidia_response.text}")
         raise HTTPException(status_code=500, detail="Invalid response format from NVIDIA API")
+    except Exception as e:
+        logger.error(f"Unexpected error in summarize endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 @app.post("/embed")
 async def create_embedding(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):

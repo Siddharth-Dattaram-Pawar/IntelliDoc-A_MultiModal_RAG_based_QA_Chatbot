@@ -165,6 +165,21 @@ def main_menu():
         st.session_state["access_token"] = None
         st.session_state["page"] = "auth"
 
+def fetch_summary(pdf_link):
+    file_key = pdf_link.split('/', 3)[-1].split('?')[0]  # Remove query params
+
+    response = requests.post(
+        f"{API_URL}/summarize",
+        headers={"Authorization": f"Bearer {st.session_state['access_token']}"},
+        json={"file_key": file_key}
+    )
+    if response.status_code == 200:
+        return response.json()["summary"]
+    else:
+        error_message = response.json().get('detail', 'Unknown error')
+        st.error(f"Failed to fetch summary. Error: {error_message}")
+        return None
+    
 def fetch_pdf_info_from_snowflake():
     response = requests.get(f"{API_URL}/pdfs", headers={"Authorization": f"Bearer {st.session_state['access_token']}"})
     if response.status_code == 200:
