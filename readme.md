@@ -90,7 +90,6 @@ poetry install
 
 ### Set up environment variables:
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
 export SNOWFLAKE_ACCOUNT="your-account"
 export PINECONE_API_KEY="your-api-key"
 export NVIDIA_API_KEY="your-api-key"
