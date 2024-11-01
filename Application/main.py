@@ -1,6 +1,3 @@
-
- 
- 
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -18,7 +15,12 @@ import io
 from pinecone import Pinecone, ServerlessSpec
 import nltk
 from nltk.tokenize import sent_tokenize
+#from sentence_transformers import SentenceTransformer
 import logging
+from pydantic import BaseModel
+import warnings
+import io
+ 
  
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +34,8 @@ try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
     nltk.download('all', download_dir=nltk_data_path)
+ 
+warnings.filterwarnings("ignore", category=UserWarning, module="multiprocessing.resource_tracker")
  
  
 # Load environment variables
@@ -56,23 +60,28 @@ INDEX_NAME = os.getenv("INDEX_NAME")
  
 pc = Pinecone(api_key=PINECONE_API_KEY)
  
-# Delete the existing index if necessary
-if INDEX_NAME in pc.list_indexes().names():
-    pc.delete_index(name=INDEX_NAME)
+def ensure_index_exists():
+    if INDEX_NAME not in pc.list_indexes().names():
+        logger.info(f"Creating new index: {INDEX_NAME}")
+        pc.create_index(
+            name=INDEX_NAME,
+            dimension=1024,  # Based on NVIDIA model's output
+            metric='cosine',
+            spec=ServerlessSpec(
+                cloud='aws',
+                region=PINECONE_ENVIRONMENT
+            )
+        )
+    else:
+        logger.info(f"Index {INDEX_NAME} already exists")
  
-# Create a new index with the correct dimension
-pc.create_index(
-    name=INDEX_NAME,
-    dimension=1024,  # Update to 1024 based on NVIDIA model's output
-    metric='cosine',
-    spec=ServerlessSpec(
-        cloud='aws',
-        region=PINECONE_ENVIRONMENT
-    )
-)
+# Call this function during startup
+ensure_index_exists()
  
 # Connect to the index
 index = pc.Index(INDEX_NAME)
+ 
+#model = SentenceTransformer('all-MiniLM-L12-v2')
  
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -152,6 +161,20 @@ def fetch_pdf_info_from_snowflake():
     finally:
         cursor.close()
         conn.close()
+ 
+def check_existing_embeddings(document_id: str):
+    try:
+        # Query Pinecone to check for existing embeddings with the given document_id prefix
+        query_response = index.query(
+            vector=[0] * 1024,  # Dummy vector
+            top_k=1,
+            include_metadata=True,
+            filter={"document_id": {"$eq": document_id}}  # Filter based on document_id
+        )
+        return len(query_response['matches']) > 0
+    except Exception as e:
+        logger.error(f"Error checking existing embeddings: {str(e)}")
+        return False
  
 # User registration endpoint
 @app.post("/register")
@@ -300,8 +323,16 @@ async def summarize(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):
 @app.post("/embed")
 async def create_embedding(pdf_link: PdfLink, token: str = Depends(oauth2_scheme)):
     logger.info(f"Starting embedding process for PDF: {pdf_link.pdf_link}")
-   
     try:
+       
+        pdf_title = pdf_link.pdf_link.split('/')[-1].split('.')[0]
+        document_id = f"pdf-{pdf_title}"
+       
+        # Check if embeddings already exist
+        if check_existing_embeddings(document_id):
+            logger.info(f"Embeddings already exist for document: {document_id}")
+            return {"message": "Embeddings already exist", "document_id": document_id}
+       
         # Fetch PDF content
         if pdf_link.pdf_link.startswith('s3://'):
             logger.info("Fetching PDF from S3")
@@ -341,18 +372,17 @@ async def create_embedding(pdf_link: PdfLink, token: str = Depends(oauth2_scheme
             "Authorization": f"Bearer {NVIDIA_API_KEY_VECTOR}",
             "Content-Type": "application/json"
         }
-        document_id = f"pdf-{hash(pdf_text)}"  # Base document ID
-        chunk_embeddings = []
  
+        chunk_embeddings = []
         logger.info("Generating embeddings for chunks")
         for i, chunk in enumerate(chunks):
             test_chunk = chunk[:1000]  # Use the first 1000 characters of the chunk
             payload = {
-                 "model": "nvidia/nv-embedqa-e5-v5",
-                 "input": [test_chunk],
-                 "encoding_format": "float",
-                 "input_type": "query"
-                 }
+                "model": "nvidia/nv-embedqa-e5-v5",
+                "input": [test_chunk],
+                "encoding_format": "float",
+                "input_type": "query"
+            }
             try:
                 nvidia_response = requests.post(nvidia_api_url, json=payload, headers=headers)
                 nvidia_response.raise_for_status()
@@ -361,11 +391,10 @@ async def create_embedding(pdf_link: PdfLink, token: str = Depends(oauth2_scheme
                 if not embeddings:
                     logger.error(f"Embedding generation failed for chunk {i}")
                     raise HTTPException(status_code=500, detail=f"Embedding generation failed for chunk {i}")
-                #chunk_id = f"{document_id}-chunk-{i}"
                 chunk_embeddings.append({
                     "id": f"{document_id}-chunk-{i}",
                     "values": embeddings,
-                    "metadata": {"text": chunk[:500]}
+                    "metadata": {"text": chunk[:500], "document_id": document_id}
                     })
                 logger.info(f"Successfully generated embedding for chunk {i}")
             except requests.RequestException as e:
@@ -386,14 +415,66 @@ async def create_embedding(pdf_link: PdfLink, token: str = Depends(oauth2_scheme
                 except Exception as e:
                     logger.error(f"Failed to upsert batch {i // batch_size + 1}: {str(e)}")
                     raise HTTPException(status_code=500, detail=f"Failed to upsert embeddings batch: {str(e)}")
- 
+               
         # Upsert embeddings in batches
         logger.info("Upserting embeddings to Pinecone in batches")
         upsert_in_batches(chunk_embeddings, index, batch_size=50)
-       
-        return {"message": f"Embeddings created and stored in Pinecone successfully for {len(chunks)} chunks", "document_id": document_id}
  
+        return {"message": f"Embeddings created and stored in Pinecone successfully for {len(chunks)} chunks", "document_id": document_id}
     except Exception as e:
         logger.error(f"Unexpected error in create_embedding: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+ 
+class ChatRequest(BaseModel):
+    user_input: str
+    document_id: str
+    conversation_history: str = ""
+ 
+@app.post("/chat")
+async def chat(request: ChatRequest, token: str = Depends(oauth2_scheme)):
+    logger.info(f"Received chat request for document: {request.document_id}")
+ 
+    # Combine conversation history with current user input
+    full_input = f"{request.conversation_history}\nYou: {request.user_input}"
+ 
+    # Generate embedding for user input (including conversation history)
+    nvidia_api_url = "https://integrate.api.nvidia.com/v1/embeddings"
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY_VECTOR}",
+        "Content-Type": "application/json"
+    }
+   
+    payload = {
+        "model": "nvidia/nv-embedqa-e5-v5",
+        "input": [full_input],
+        "encoding_format": "float",
+        "input_type": "query"
+    }
+ 
+    try:
+        nvidia_response = requests.post(nvidia_api_url, json=payload, headers=headers)
+        nvidia_response.raise_for_status()
+        response_data = nvidia_response.json()
+        user_vector = response_data["data"][0]["embedding"]
+ 
+        # Query Pinecone with the user input embedding
+        query_result = index.query(
+            vector=user_vector,
+            top_k=3,  # Retrieve top 3 chunks instead of just 1
+            include_metadata=True,
+            filter={"document_id": request.document_id}
+        )
+ 
+        if query_result['matches']:
+            combined_context = "\n".join([match['metadata']['text'] for match in query_result['matches']])
+           
+            return {
+                "response": f"Based on the context:\n\n{combined_context}\n\n"
+            }
+        else:
+            return {"response": "No relevant information found."}
+ 
+    except requests.RequestException as e:
+        logger.error(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"An error occurred while processing your request: {str(e)}")
  
